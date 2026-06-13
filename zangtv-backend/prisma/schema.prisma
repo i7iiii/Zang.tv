@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole     { user moderator admin }
+enum UserPlan     { free premium }
+enum AuthProvider { local google facebook }
+enum ChannelStatus { active inactive testing }
+enum ChannelQuality { SD HD FHD UHD }
+
+model User {
+  id            String       @id @default(uuid())
+  name          String
+  email         String       @unique
+  passwordHash  String?      @map("password_hash")
+  provider      AuthProvider @default(local)
+  providerId    String?      @map("provider_id")
+  avatarUrl     String?      @map("avatar_url")
+  role          UserRole     @default(user)
+  plan          UserPlan     @default(free)
+  planExpiresAt DateTime?    @map("plan_expires_at")
+  isVerified    Boolean      @default(false) @map("is_verified")
+  isBanned      Boolean      @default(false) @map("is_banned")
+  langPref      String       @default("ku") @map("lang_pref")
+  lastLoginAt   DateTime?    @map("last_login_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  favorites     Favorite[]
+  watchSessions WatchSession[]
+  refreshTokens RefreshToken[]
+  preferences   UserPreference?
+  @@map("users")
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  nameKu    String   @map("name_ku")
+  nameAr    String?  @map("name_ar")
+  nameEn    String?  @map("name_en")
+  icon      String?
+  color     String?
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  channels  Channel[]
+  @@map("categories")
+}
+
+model Channel {
+  id         String         @id @default(uuid())
+  slug       String         @unique
+  nameKu     String         @map("name_ku")
+  nameAr     String?        @map("name_ar")
+  nameEn     String?        @map("name_en")
+  logoUrl    String?        @map("logo_url")
+  bannerUrl  String?        @map("banner_url")
+  streamUrl  String         @map("stream_url")
+  backupUrl  String?        @map("backup_url")
+  websiteUrl String?        @map("website_url")
+  categoryId String?        @map("category_id")
+  country    String?
+  language   String?
+  quality    ChannelQuality @default(HD)
+  status     ChannelStatus  @default(active)
+  isFeatured Boolean        @default(false) @map("is_featured")
+  sortOrder  Int            @default(0) @map("sort_order")
+  tags       String[]
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  category      Category?      @relation(fields: [categoryId], references: [id])
+  favorites     Favorite[]
+  watchSessions WatchSession[]
+  @@map("channels")
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  channelId String   @map("channel_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  @@unique([userId, channelId])
+  @@map("favorites")
+}
+
+model WatchSession {
+  id          String    @id @default(uuid())
+  userId      String?   @map("user_id")
+  channelId   String    @map("channel_id")
+  ipHash      String?   @map("ip_hash")
+  userAgent   String?   @map("user_agent")
+  durationSec Int       @default(0) @map("duration_sec")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  channel     Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  @@map("watch_sessions")
+}
+
+model UserPreference {
+  userId          String   @id @map("user_id")
+  categoryWeights Json     @default("{}") @map("category_weights")
+  countryPref     String[] @map("country_pref")
+  langPref        String[] @map("lang_pref")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_preferences")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("refresh_tokens")
+}
